@@ -1,0 +1,400 @@
+#pragma METAINFO("zelda_botw", 1, 0, "YG")
+
+
+#include <switch.gph>
+#include <display.gph>
+
+#define SWITCH_L_ACCX     ACCEL_1_X
+#define SWITCH_L_ACCY     ACCEL_1_Y
+#define SWITCH_L_ACCZ     ACCEL_1_Z
+
+#define SWITCH_R_ACCX     ACCEL_2_X
+#define SWITCH_R_ACCY     ACCEL_2_Y
+#define SWITCH_R_ACCZ     ACCEL_2_Z
+
+
+uint8 pair_key_button;
+
+uint32 time_counter;
+uint32 time_counter_stop;
+fix32 min_value;
+fix32 max_value;
+fix32 current_value;
+bool run_flag;
+bool walk_flag;
+
+bool mid_flag;
+bool left_flag;
+bool right_flag;
+uint32 mid_counter;
+
+int delay_time_r;
+int delay_time;
+// shield
+bool shield_flag;
+
+bool open_ring_flag;
+bool happen_flag;
+bool happen_flag_zl;
+init {
+
+	pair_key_button = SWITCH_R;
+	
+	time_counter = 0;
+	time_counter_stop = 0;
+	min_value = 100.0;
+    max_value = -100.0;
+	current_value = -25.0;
+	run_flag = TRUE;
+	walk_flag = FALSE;
+	
+	mid_flag = TRUE;
+	left_flag = FALSE;
+	right_flag = FALSE;
+	mid_counter = 0;
+	
+	shield_flag = FALSE;
+
+	open_ring_flag = TRUE;
+	
+	delay_time = 100;
+	delay_time_r = 200;
+	happen_flag = FALSE;
+	happen_flag_zl = FALSE;
+	//remapper_swap(SWITCH_HOME, SWITCH_L);
+	//remapper_swap(SWITCH_L, SWITCH_HOME);
+}
+
+main {
+	
+	ControllerAdjust(SWITCH_LY, 22.06);
+	ControllerAdjust(SWITCH_LX, -10.20);
+	ControllerAdjust(SWITCH_RY, -26.0);
+	ControllerAdjust(SWITCH_RX, -3.45);
+	ControllerAdjust(SWITCH_ACCZ, 24.42);
+	ControllerAdjust(ACCEL_2_X, -2.91);
+	ControllerAdjust(ACCEL_2_Y, 1.5);
+	//ControllerAdjust(ACCEL_2_Z, -29.08);
+	ControllerAdjust(GYRO_1_X, -0.13);
+	ControllerAdjust(GYRO_1_Y, 0.5);
+	ControllerAdjust(GYRO_1_Z, -0.15);
+	
+	//hold A then press B, turn on or off using ring-con to play
+	if(check_active(SWITCH_A, 1000)){
+		
+		if(event_active(SWITCH_B)){
+			open_ring_flag = !open_ring_flag;
+			//set_val(SWITCH_X, 100);
+			//combo_run(ClearWait);
+		}
+		//printf("%d", open_ring_flag);
+	}	
+	if(open_ring_flag){
+		
+		
+		// Running, walking, standing
+		if(run_flag){
+			set_val(SWITCH_LY, -90.0);
+		}
+		if(walk_flag){
+			set_val(SWITCH_LY, -22.0);
+		}
+
+		time_counter += elapsed_time();
+		time_counter_stop += elapsed_time();
+		
+		current_value = get_val(SWITCH_L_ACCY);
+		if(current_value < min_value) {
+			min_value = current_value;
+		}
+		if(current_value > max_value){
+			max_value = current_value;
+		}
+		
+		//Link stops -- no delay after I stop
+		if(time_counter_stop >= 100){
+			time_counter_stop = 0;
+			if(max_value - min_value < 1.0){
+				walk_flag =FALSE;
+				run_flag = FALSE;
+				min_value = 100.0;
+				max_value = -100.0;
+			}
+		}	
+		
+		//Periodically check if I am walking or running
+		if(time_counter >= 700) {
+			time_counter = 0;
+			if(max_value - min_value > 40.0) {
+				run_flag = TRUE;
+				walk_flag = FALSE;
+			} else if(max_value - min_value > 15.0){ 
+				walk_flag =TRUE;
+				run_flag = FALSE;
+			} else {
+				walk_flag =FALSE;
+				run_flag = FALSE;
+			}
+			//printf("test");
+			min_value = 100.0;
+			max_value = -100.0;
+		}
+
+		
+		
+		//Use R + X/Y/A/B/+/ZR/RS combo to monitor up/left/right/down/-/ZL/LS
+		if(event_active(SWITCH_R)){
+			combo_run(Rdelay);
+		}
+		
+		ButtonPair(pair_key_button, SWITCH_X, SWITCH_UP);
+		ButtonPair(pair_key_button, SWITCH_Y, SWITCH_LEFT);
+		ButtonPair(pair_key_button, SWITCH_A, SWITCH_RIGHT);
+		ButtonPair(pair_key_button, SWITCH_B, SWITCH_DOWN);
+		ButtonPair(pair_key_button, SWITCH_PLUS, SWITCH_MINUS);
+		ButtonPair_ZL(pair_key_button, SWITCH_ZR, SWITCH_ZL);
+		ButtonPair(pair_key_button, SWITCH_RS, SWITCH_LS);
+		//L <-> HOME
+		SwitchButtons(SWITCH_L, SWITCH_HOME);
+		
+		
+		//shield and lockon
+
+		if(get_val(SWITCH_GYROX) > 30.0) {
+			shield_flag = TRUE;
+		}
+		if(get_val(SWITCH_GYROX) < -30.0) {
+			shield_flag = FALSE;
+		}
+		if(shield_flag){
+			set_val(SWITCH_ZL, 100.0); 
+		}
+
+		// select items
+		
+		if(get_val(SWITCH_UP) > 0.0 || get_val(SWITCH_LEFT) > 0.0 || get_val(SWITCH_RIGHT) > 0.0){
+			
+			if(left_flag){
+				set_val(SWITCH_RX, -90.0);
+			}
+			if(right_flag){
+				set_val(SWITCH_RX, 90.0);
+			}
+
+			if(get_val(SWITCH_GYROZ) < -15.0){
+				if(mid_flag){
+					left_flag = TRUE;
+					mid_flag = FALSE;
+					right_flag = FALSE;
+				}
+				if(left_flag){
+					left_flag = TRUE;
+					mid_flag = FALSE;
+					right_flag = FALSE;
+				}
+				if(right_flag){
+					left_flag = FALSE;
+					mid_flag = FALSE;
+					right_flag = FALSE;
+				}
+			}
+			if(get_val(SWITCH_GYROZ) > 15.0){
+				if(mid_flag){
+					left_flag = FALSE;
+					mid_flag = FALSE;
+					right_flag = TRUE;
+				}
+				if(left_flag){
+					left_flag = FALSE;
+					mid_flag = FALSE;
+					right_flag = FALSE;
+				}
+				if(right_flag){
+					left_flag = FALSE;
+					mid_flag = FALSE;
+					right_flag = TRUE;
+				}
+			}
+			if(!left_flag && !right_flag && !mid_flag){
+				mid_counter += elapsed_time();
+				if(mid_counter > 300){
+					mid_flag = TRUE;
+					mid_counter = 0;
+				}
+			}
+
+		} else {
+			left_flag = FALSE;
+			mid_flag = TRUE;
+			right_flag = FALSE;
+		}
+		
+		//A cheap way to enable the left stick on the right one
+		if(get_val(SWITCH_R_ACCY) >= 4.0){
+			if(get_val(SWITCH_UP) == 0.0 && get_val(SWITCH_LEFT) == 0.0 && get_val(SWITCH_RIGHT) == 0.0){
+				set_val(SWITCH_RX, 0.0);
+				set_val(SWITCH_RY, 0.0);
+				set_val(SWITCH_LX, get_actual(SWITCH_RX));
+				set_val(SWITCH_LY, get_actual(SWITCH_RY));
+			}
+		}
+		
+		
+		
+		
+		//Start the right joy-con
+		// Y: Squeeze or violently shaken to attack
+		
+		if(get_val(SWITCH_R_ACCX) > 25.0 && get_val(SWITCH_R_ACCZ) < -16.0 && get_val(SWITCH_R_ACCZ) > -60.0){
+			set_val(SWITCH_Y, 100.0); 
+		}	
+		
+		// X: Jump lift ring con
+		
+		if(get_val(SWITCH_R_ACCZ) < -70.0 && get_val(SWITCH_GYROX) > -25.0){
+			set_val(SWITCH_X, 100.0); 
+		}
+		
+		// A: Action  squat + rotate x
+		if(get_val(SWITCH_L_ACCZ) < -10.0 && !run_flag && !walk_flag && get_val(SWITCH_GYROX) < -25.0){
+			set_val(SWITCH_A, 100.0); 
+		}
+		
+		// B:rotate z	
+		
+		if(get_val(SWITCH_GYROZ) < -35.0){
+			if(get_val(SWITCH_UP) == 0.0 && get_val(SWITCH_LEFT) == 0.0 && get_val(SWITCH_RIGHT) == 0.0){
+				set_val(SWITCH_B, 100.0); 
+			}
+		}
+		
+		//combo_run(length);
+		
+	}
+
+
+}
+
+
+//some problems with my switch
+void ControllerAdjust(uint8 stick, fix32 threshold){
+	fix32 stick_value = get_val(stick);
+	fix32 actual_value = stick_value - threshold;
+	if (abs(actual_value) < 0.8) {
+		set_val(stick,0);
+	} else {
+		set_val(stick,actual_value);
+	}
+	
+	
+}
+
+void ButtonPair(uint8 b1, uint8 b2, uint8 out){
+	
+	if(get_actual(SWITCH_ZR) == 0.0){
+		if(get_actual(b1) > 0.0 && get_actual(b2) >0.0){
+			set_val(b1, 0.0); 
+			set_val(b2, 0.0); 
+			set_val(out, 100.0); 
+			happen_flag = TRUE;
+		}
+	}
+	if(happen_flag && (event_release(b1) || event_release(b2))){
+		//printf("%d", happen_flag);
+		//Use R + X/Y/A/B/+/ZR/RS
+		happen_flag = FALSE;
+		combo_run(R_Delay);
+		combo_run(X_Delay);
+		combo_run(Y_Delay);
+		combo_run(A_Delay);
+		combo_run(B_Delay);
+		combo_run(Plus_Delay);
+		combo_run(ZR_Delay);
+		combo_run(RS_Delay);
+	}
+}
+
+void ButtonPair_ZL(uint8 b1, uint8 b2, uint8 out){
+	
+	if(get_actual(b1) > 0.0 && get_actual(b2) >0.0){
+		set_val(b1, 0.0); 
+		set_val(b2, 0.0); 
+		set_val(out, 100.0); 
+		happen_flag_zl = TRUE;
+	}
+	if(happen_flag_zl && (event_release(b1) || event_release(b2))){
+		//printf("%d", happen_flag);
+		happen_flag_zl = FALSE;
+		combo_run(R_Delay);
+		combo_run(X_Delay);
+		combo_run(Y_Delay);
+		combo_run(A_Delay);
+		combo_run(B_Delay);
+		combo_run(Plus_Delay);
+		combo_run(ZR_Delay);
+		combo_run(RS_Delay);
+	}
+}
+
+void SwitchButtons(uint8 b1, uint8 b2){
+	if(get_actual(b1) > 0.0) {
+		set_val(b1, 0.0);
+		set_val(b2, 100.0);
+	}
+	
+	if(get_actual(b2) > 0.0) {
+		set_val(b2, 0.0);
+		set_val(b1, 100.0);
+	}
+}
+
+
+combo length{
+	set_val(SWITCH_X, 20);
+	wait(300);
+}
+
+combo ClearX{
+	wait(100);
+}
+
+combo Rdelay{
+	set_val(SWITCH_R, 0.0);
+	wait(delay_time_r);
+	//set_val(SWITCH_X, 100);
+	//wait(delay_time);
+}
+
+//Use R + X/Y/A/B/+/ZR/RS
+combo R_Delay{
+	set_val(SWITCH_R, 0.0);
+	wait(delay_time);
+}
+combo X_Delay{	
+	set_val(SWITCH_X, 0.0);
+	wait(delay_time);
+}
+combo Y_Delay{	
+	set_val(SWITCH_Y, 0.0);
+	wait(delay_time);
+}
+combo A_Delay{
+	set_val(SWITCH_A, 0.0);
+	wait(delay_time);
+}
+combo B_Delay{
+	set_val(SWITCH_B, 0.0);
+	wait(delay_time);
+}
+combo Plus_Delay{
+	set_val(SWITCH_PLUS, 0.0);
+	wait(delay_time);
+}
+combo ZR_Delay{	
+	set_val(SWITCH_ZR, 0.0);
+	wait(delay_time);
+}
+combo RS_Delay{		
+	set_val(SWITCH_RS, 0.0);
+	wait(delay_time);
+}

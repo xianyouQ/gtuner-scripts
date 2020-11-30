@@ -1,0 +1,485 @@
+#pragma METAINFO("gesture", 1, 0, "qyx")
+
+
+#include <switch.gph>
+#include <display.gph>
+
+
+#define RING_CON_ACCX     ACCEL_2_X
+#define RING_CON_ACCY     ACCEL_2_Y
+#define RING_CON_ACCZ     ACCEL_2_Z
+
+#define FOOT_ACCX  ACCEL_1_X
+#define FOOT_ACCY  ACCEL_1_Y
+#define FOOT_ACCZ  ACCEL_1_Z
+
+#define STATUS_circleQuarterLeft 0
+#define STATUS_circleQuarterLeftBack 1
+#define STATUS_circleHalfLeft 2
+#define STATUS_circleHalfLeftBack 3
+#define STATUS_circleQuarterRight 4
+#define STATUS_circleQuarterRightBack 5
+#define STATUS_circleHalfRight 6
+#define STATUS_circleHalfRightBack 7
+#define STATUS_turnQuarterAHead 8
+#define STATUS_turnQuarterAHeadBack 9
+#define STATUS_turnHalfAHead 10
+#define STATUS_turnHalfAHeadBack 11
+#define STATUS_turnQuarterBack 12
+#define STATUS_turnQuarterBackBack 13
+#define STATUS_turnHalfBack 14
+#define STATUS_turnHalfBackBack 15
+#define STATUS_footLeft 16
+#define STATUS_footRight 17
+
+#define STATUS_WALK 100
+#define STATUS_RUN 101
+
+
+#define STATUS_HandUp 20
+#define STATUS_HandUpLeft 21
+#define STATUS_HandLeft 22
+#define STATUS_HandDownLeft 23
+#define STATUS_HandDown 24
+#define STATUS_HandDownRight 25
+#define STATUS_HandRight 26
+#define STATUS_HandUpRight 27
+
+
+#define STATUS_STOP 102
+
+
+
+fix32 ring_con_acc_X;
+fix32 ring_con_acc_Y;
+fix32 ring_con_acc_Z;
+fix32 ring_con_acc_X_pre;
+fix32 ring_con_acc_Y_pre;
+fix32 ring_con_acc_Z_pre;
+fix32 ring_con_acc_X_sum;
+fix32 ring_con_acc_Y_sum;
+fix32 ring_con_acc_Z_sum;
+fix32 ring_con_acc_X_acc;
+fix32 ring_con_acc_Y_acc;
+fix32 ring_con_acc_Z_acc;
+fix32 foot_acc_X;
+fix32 foot_acc_Y;
+fix32 foot_acc_Z;
+fix32 foot_acc_X_pre;
+fix32 foot_acc_Y_pre;
+fix32 foot_acc_Z_pre;
+fix32 foot_acc_X_sum;
+fix32 foot_acc_Y_sum;
+fix32 foot_acc_Z_sum;
+fix32 foot_acc_X_acc;
+fix32 foot_acc_Y_acc;
+fix32 foot_acc_Z_acc;
+int ring_con_acc_time;
+fix32 walk_interval;
+int ring_con_status;
+fix32 ring_con_speed;
+int foot_status;
+
+int hand_status;
+
+init {
+  	ring_con_acc_X = -50.0;
+	ring_con_acc_Y = -50.0;
+	ring_con_acc_Z = -50.0;
+	ring_con_acc_X_pre = -50.0;
+	ring_con_acc_Y_pre = -50.0;
+	ring_con_acc_Z_pre = -50.0;
+	ring_con_acc_X_sum = 0.0;
+	ring_con_acc_Y_sum = 0.0;
+	ring_con_acc_Z_sum = 0.0;
+	ring_con_acc_X_acc = 0.0;
+	ring_con_acc_Y_acc = 0.0;
+	ring_con_acc_Z_acc = 0.0;
+	ring_con_acc_time = 0;
+	foot_acc_X = - 50.0;
+	foot_acc_Y = - 50.0;
+	foot_acc_Z = - 50.0;
+	foot_acc_X_pre = -50.0;
+	foot_acc_Y_pre = -50.0;
+	foot_acc_Z_pre = -50.0;
+	foot_acc_X_sum = 0.0;
+	foot_acc_Y_sum = 0.0;
+	foot_acc_Z_sum = 0.0;
+	foot_acc_X_acc = 0.0;
+	foot_acc_Y_acc = 0.0;
+	foot_acc_Z_acc = 0.0;
+}	
+
+main {
+	//修复joy-con的误差
+	ControllerAdjust(SWITCH_LY, 22.06);
+	ControllerAdjust(SWITCH_LX, -10.20);
+	ControllerAdjust(SWITCH_RY, -26.0);
+	ControllerAdjust(SWITCH_RX, -3.45);
+	ControllerAdjust(SWITCH_ACCZ, 24.42);
+	//ControllerAdjust(ACCEL_2_X, -1.7);
+	ControllerAdjust(ACCEL_2_Y, 0.5);
+	ControllerAdjust(ACCEL_2_Z, 4.5);
+	ControllerAdjust(GYRO_1_X, -0.13);
+	ControllerAdjust(GYRO_1_Y, 0.5);
+	ControllerAdjust(GYRO_1_Z, -0.15);
+	
+	
+	ring_con_acc_X = get_val(RING_CON_ACCX);
+	if (ring_con_acc_X_pre != -50.0) {
+		ring_con_acc_X_sum = ring_con_acc_X_sum + ring_con_acc_X - ring_con_acc_X_pre;
+	}
+	ring_con_acc_X_pre = ring_con_acc_X;
+	ring_con_acc_Y = get_val(RING_CON_ACCY);
+	if (ring_con_acc_Y_pre != -50.0) {
+		ring_con_acc_Y_sum = ring_con_acc_Y_sum + ring_con_acc_Y - ring_con_acc_Y_pre;
+	}
+	ring_con_acc_Y_pre = ring_con_acc_Y;
+
+	ring_con_acc_Z = get_val(RING_CON_ACCZ);
+	if (ring_con_acc_Z_pre != -50.0) {
+		ring_con_acc_Z_sum = ring_con_acc_Z_sum + ring_con_acc_Z - ring_con_acc_Z_pre;
+	}
+	ring_con_acc_Z_pre = ring_con_acc_Z;
+	
+	foot_acc_X = get_val(FOOT_ACCX);
+	if (foot_acc_X_pre != -50.0) {
+		foot_acc_X_sum = foot_acc_X_sum + foot_acc_X - foot_acc_X_pre;
+	}
+	foot_acc_X_pre = foot_acc_X;
+	
+	
+	foot_acc_Y = get_val(FOOT_ACCY);
+	if (foot_acc_Y_pre != -50.0) {
+		foot_acc_Y_sum = foot_acc_Y_sum + foot_acc_Y - foot_acc_Y_pre;
+	}
+	foot_acc_Y_pre = foot_acc_Y;
+	
+	
+	foot_acc_Z = get_val(FOOT_ACCZ);
+	if (ring_con_acc_Z_pre != -50.0) {
+		foot_acc_Z_sum = foot_acc_Z_sum + foot_acc_Z - foot_acc_Z_pre;
+	}
+	foot_acc_Z_pre = foot_acc_Z;
+	
+	
+	ring_con_acc_time = ring_con_acc_time + elapsed_time();
+	//printf("ring_con_acc_X:%f...ring_con_acc_Y:%f....ring_con_acc_Z:%f\n", ring_con_acc_X,ring_con_acc_Y,ring_con_acc_Z);
+
+	if (ring_con_acc_time > 100) {
+		//printf("ring_con_acc_X_sum:%f...ring_con_acc_time:%d\n", ring_con_acc_X_sum,ring_con_acc_time);
+
+		ring_con_acc_X_acc = ring_con_acc_X_sum/(fix32)ring_con_acc_time*1000.0;
+		ring_con_acc_Y_acc = ring_con_acc_Y_sum/(fix32)ring_con_acc_time*1000.0;
+        ring_con_acc_Z_acc = ring_con_acc_Z_sum/(fix32)ring_con_acc_time*1000.0;
+		
+		foot_acc_X_acc = foot_acc_X_sum/(fix32)ring_con_acc_time*1000.0;
+		foot_acc_Y_acc = foot_acc_Y_sum/(fix32)ring_con_acc_time*1000.0;
+		foot_acc_Z_acc = foot_acc_Z_sum/(fix32)ring_con_acc_time*1000.0;
+		
+		ring_con_acc_time = 0;
+		ring_con_acc_X_sum = 0.0;
+		ring_con_acc_Y_sum = 0.0;
+		ring_con_acc_Z_sum = 0.0;
+		
+		foot_acc_X_sum = 0.0;
+		foot_acc_Y_sum = 0.0;
+		foot_acc_Z_sum = 0.0;
+		
+		if (ring_con_acc_X_acc > 20.0 || ring_con_acc_Y_acc > 20.0 || ring_con_acc_Z_acc > 20.0) {
+			if (ring_con_acc_Z_acc < 330.0 && abs(ring_con_acc_Z) < 20.0 ) {
+				ring_con_status = CheckRingConCircleStatus(ring_con_acc_X,
+										 ring_con_acc_Y,
+										 ring_con_acc_X_acc,
+										 ring_con_acc_Y_acc);
+				ring_con_speed = (fix32)sqrt(sq(ring_con_acc_X_acc) + sq(ring_con_acc_Y_acc));
+				ring_con_speed = (fix32)(ring_con_speed * 25.0/abs((25.0 - abs(ring_con_acc_Z))));
+			} else if (ring_con_acc_X_acc > 20.0){
+				ring_con_status = CheckRingConTurnStatus(ring_con_acc_X, ring_con_acc_Z);
+				ring_con_speed = (fix32)sqrt(sq(ring_con_acc_X_acc) + sq(ring_con_acc_Z_acc));
+
+			} 
+			debug(ring_con_status,ring_con_speed);
+
+		} else {
+			ring_con_status = STATUS_STOP;
+			ring_con_speed = 0.0;
+		}
+		
+		if (foot_acc_X_acc > 50.0 || foot_acc_Y_acc > 10.0) {
+			foot_status = CheckFootStatus(foot_acc_X_acc,foot_acc_Z_acc);
+			debug(foot_status,0.0);
+		}
+	}
+	//not working
+	//if (foot_status == STATUS_STOP && ring_con_status == STATUS_STOP) {
+	//	fix32 gyro_X_value = get_val(GYRO_1_X);
+	//	fix32 gyro_Y_value = get_val(GYRO_1_Y);
+	//	fix32 gyro_Z_value = get_val(GYRO_1_Z);
+	//	hand_status = CheckHandStatus(gyro_X_value,gyro_Y_value,gyro_Z_value);
+	//	debug(hand_status,0.0);
+
+	//}
+    
+	
+	
+}
+
+int CheckHandStatus(fix32 gyro_X_value, fix32 gyro_Y_value, fix32 gyro_Z_value) {
+	if (gyro_X_value > 15.0) {
+		if (gyro_Y_value > 15.0) {
+			return STATUS_HandDownLeft;
+		}
+		if (gyro_Y_value < -15.0) {
+			return STATUS_HandUpLeft;
+		}
+		return STATUS_HandLeft;
+	}
+	if (gyro_X_value < -15.0) {
+		if (gyro_Y_value > 15.0) {
+			return STATUS_HandDownRight;
+		}
+		if (gyro_Y_value < -15.0) {
+			return STATUS_HandUpRight;
+		}
+		return STATUS_HandRight;
+	}
+	if (gyro_Y_value > 15.0) {
+			return STATUS_HandDown;
+	}
+	if (gyro_Y_value < -15.0) {
+		return STATUS_HandUp;
+	}
+	return STATUS_STOP;
+}
+
+int CheckFootStatus(fix32 foot_acc_X_acc, fix32 foot_acc_Z_acc) {
+	if (abs(foot_acc_X_acc) > 160.0) {
+		return STATUS_RUN;
+	}
+	if (abs(foot_acc_X_acc) > 80.0) {
+		return STATUS_WALK;
+	}
+	if (foot_acc_Z_acc < -10.0) {
+		return STATUS_footLeft;
+	}
+	if (foot_acc_Z_acc > 10.0) {
+		return STATUS_footRight;
+	}
+	return STATUS_STOP;
+	
+}
+void debug(int status , fix32 speed) {
+	if (status == STATUS_circleQuarterLeft) {
+				printf("circleQuarterLeft....%f\n",speed);
+
+	}
+	if (status == STATUS_circleQuarterLeftBack) {
+				printf("circleQuarterLeftBack....%f\n",speed);
+
+	}
+	if (status == STATUS_circleHalfLeft) {
+				printf("circleHalfLeft....%f\n",speed);
+
+	}
+	if (status == STATUS_circleHalfLeftBack) {
+				printf("circleHalfLeftBack....%f\n",speed);
+
+	}
+	if (status == STATUS_circleQuarterRight) {
+				printf("circleQuarterRight....%f\n",speed);
+
+	}
+	if (status == STATUS_circleQuarterRightBack) {
+				printf("circleQuarterRightBack....%f\n",speed);
+
+	}
+	if (status == STATUS_circleHalfRight) {
+				printf("circleHalfRight....%f\n",speed);
+
+	}
+	if (status == STATUS_circleHalfRightBack) {
+				printf("circleHalfRightBack....%f\n",speed);
+
+	}
+		if (status == STATUS_turnQuarterAHead) {
+		printf("turnQuarterAHead....%f\n",speed);
+
+	}
+	if (status == STATUS_turnQuarterAHeadBack) {
+		printf("turnQuarterAHeadBack....%f\n",speed);
+
+	}
+	if (status == STATUS_turnHalfAHead) {
+				printf("turnHalfAHead....%f\n",speed);
+
+	}
+	if (status == STATUS_turnHalfAHeadBack) {
+		printf("turnHalfAHeadBack....%f\n",speed);
+
+	}
+	if (status == STATUS_turnQuarterBack) {
+		printf("turnQuarterBack....%f\n",speed);
+
+	}
+	if (status == STATUS_turnQuarterBackBack) {
+		printf("turnQuarterBackBack....%f\n",speed);
+
+	}
+	if (status == STATUS_turnHalfBack) {
+		printf("turnHalfBack....%f\n",speed);
+
+	}
+	if (status == STATUS_turnHalfBackBack) {
+		printf("turnHalfBackBack....%f\n",speed);
+
+	}
+	if (status == STATUS_footLeft) {
+		printf("footLeft....%f\n",speed);
+
+	}
+		if (status == STATUS_footRight) {
+		printf("footRight....%f\n",speed);
+
+	}
+	if (status == STATUS_WALK) {
+		printf("WALK....%f\n",speed);
+
+	}
+	if (status == STATUS_RUN) {
+		printf("RUN....%f\n",speed);
+
+	}
+		if (status == STATUS_HandUp) {
+		printf("STATUS_HandUp....%f\n",speed);
+
+	}
+		if (status == STATUS_HandUpLeft) {
+		printf("STATUS_HandUpLeft....%f\n",speed);
+
+	}
+		if (status == STATUS_HandLeft) {
+		printf("STATUS_HandLeft....%f\n",speed);
+
+	}
+		if (status == STATUS_HandDownLeft) {
+		printf("STATUS_HandDownLeft....%f\n",speed);
+
+	}
+		if (status == STATUS_HandDown) {
+		printf("STATUS_HandDown....%f\n",speed);
+
+	}
+		if (status == STATUS_HandDownRight) {
+		printf("STATUS_HandDownRight....%f\n",speed);
+
+	}
+		if (status == STATUS_HandRight) {
+		printf("HandRight....%f\n",speed);
+
+	}
+		if (status == STATUS_HandUpRight) {
+		printf("HandUpRight....%f\n",speed);
+
+	}
+
+}
+
+
+void SwitchButtons(uint8 b1, uint8 b2){
+	if(get_actual(b1) > 0.0) {
+		set_val(b1, 0.0);
+		set_val(b2, 100.0);
+	}
+	
+	if(get_actual(b2) > 0.0) {
+		set_val(b2, 0.0);
+		set_val(b1, 100.0);
+	}
+}
+
+
+int CheckRingConTurnStatus(fix32 ring_con_acc_X, fix32 ring_con_acc_Z) {
+	if (ring_con_acc_Z > 5.0) {
+		if (ring_con_acc_X > 5.0) {
+				if (ring_con_acc_X_acc < -5.0) {
+					return STATUS_turnQuarterBack;
+				} else if (ring_con_acc_X_acc > 5.0) {
+					return STATUS_turnQuarterBackBack;
+				}
+		} else {
+				if (ring_con_acc_X_acc < -5.0) {
+					return STATUS_turnHalfBack;
+				} else if (ring_con_acc_X_acc > 5.0) {
+					return STATUS_turnHalfBackBack;
+				}
+		}
+	} else {
+		if (ring_con_acc_X > 5.0) {
+				if (ring_con_acc_X_acc < -5.0) {
+					return STATUS_turnQuarterAHead;
+				} else if (ring_con_acc_X_acc > 5.0) {
+					return STATUS_turnQuarterAHeadBack;
+				}
+		} else {
+				if (ring_con_acc_X_acc < -5.0) {
+					return STATUS_turnHalfAHead;
+				} else if (ring_con_acc_X_acc > 5.0) {
+					return STATUS_turnHalfAHeadBack;
+				}
+		}
+	}
+	return STATUS_STOP;
+}
+
+
+int CheckRingConCircleStatus(fix32 ring_con_acc_X, 
+                       fix32 ring_con_acc_Y,
+					   fix32 ring_con_acc_X_acc,
+                       fix32 ring_con_acc_Y_acc
+                       ) {
+		if (ring_con_acc_X > 5.0) {
+			if (ring_con_acc_Y > 5.0) {
+				if (ring_con_acc_X_acc < -5.0) {
+					return STATUS_circleQuarterRight;
+				} else if (ring_con_acc_X_acc > -5.0) {
+					return STATUS_circleQuarterRightBack;
+				}
+			} else {
+				if (ring_con_acc_X_acc < -5.0) {
+					return STATUS_circleQuarterLeft;
+				} else if (ring_con_acc_X_acc > 5.0) {
+					return STATUS_circleQuarterLeftBack;
+				}
+			}
+			
+		} else {
+			if (ring_con_acc_Y > 5.0) {
+				if (ring_con_acc_X_acc < -5.0) {
+					return STATUS_circleHalfRight;
+				} else if (ring_con_acc_X_acc > 5.0) {
+					return STATUS_circleHalfRightBack;
+				}
+			} else {
+				if (ring_con_acc_X_acc < -5.0) {
+					return STATUS_circleHalfLeft;
+				} else if (ring_con_acc_X_acc > 5.0) {
+					return STATUS_circleHalfLeftBack;
+				}
+			}
+			
+		}
+		return STATUS_STOP;
+						   
+}
+//some problems with my switch
+void ControllerAdjust(uint8 stick, fix32 threshold){
+	fix32 stick_value = get_val(stick);
+	fix32 actual_value = stick_value - threshold;
+	if (abs(actual_value) < 0.8) {
+		set_val(stick,0);
+	} else {
+		set_val(stick,actual_value);
+	}
+}
+
